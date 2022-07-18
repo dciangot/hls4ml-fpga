@@ -1,0 +1,7 @@
+hls4ml
+numpy
+matplotlib
+sklearn
+pandas
+tensorflow
+pydot
