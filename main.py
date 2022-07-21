@@ -34,7 +34,14 @@ class Trainer:
     def __init__(self, fpga_part_number) -> None:
         
         self.fpga_part_number = fpga_part_number
-        self.available_datasets = ["mnist_784", "CIFAR_10", "banknote-authentication", "Fashion-MNIST"]
+        self.available_datasets = [
+            "mnist_784", 
+            "CIFAR_10", 
+            "banknote-authentication",
+            "Fashion-MNIST",
+            "hls4ml_lhc_jets_hlf",
+            "shuttle-landing-control",
+            "climate-model-simulation-crashes"]
         self.dataset = None
         self.vivado_path = '/tools/Xilinx/Vivado/2019.2/bin:'
         self.seed = 0
@@ -118,16 +125,22 @@ class Trainer:
         classes_len = len(self.classes)
 
         print(bcolors.OKGREEN + " # Input shape is: "+str(self.X_train_val.shape)+bcolors.WHITE)
+
         self.model = Sequential()
-        self.model.add(Dense(2, input_shape=(self.X_train_val.shape[1],)))
+        self.model.add(Dense(1, input_shape=(self.X_train_val.shape[1],), name='fc1', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
         self.model.add(Activation(activation='relu', name='relu1'))
+        self.model.add(Dense(32, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+        self.model.add(Activation(activation='relu', name='relu2'))
+        self.model.add(Dense(32, name='fc3', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+        self.model.add(Activation(activation='relu', name='relu3'))
         self.model.add(Dense(classes_len, name='output', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
         self.model.add(Activation(activation='softmax', name='softmax'))
+
         adam = Adam(lr=0.0001)
         self.model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
         
         print(bcolors.OKGREEN + " # INFO: Start model training ... "+bcolors.WHITE)
-        self.model.fit(self.X_train_val, self.y_train_val, batch_size=int(self.X_train_val.shape[1]/80), epochs=10, validation_split=0.25, shuffle=True)
+        self.model.fit(self.X_train_val, self.y_train_val, batch_size=int(self.X_train_val.shape[1]*10), epochs=10, validation_split=0.25, shuffle=True)
         
         print(bcolors.OKGREEN + " # INFO: Training finished, saved model path: "+'models/'+self.dataset+'_KERAS_model.h5'+bcolors.WHITE)
         save_model(self.model, 'models/'+self.dataset+'_KERAS_model.h5')
@@ -139,11 +152,11 @@ class Trainer:
         print(bcolors.OKGREEN + " # INFO: Accuracy is "+accuracy+bcolors.WHITE)
 
     def build_model_fpga(self):
-        config = hls4ml.utils.config_from_keras_model(self.model, granularity='Model')
+        config = hls4ml.utils.config_from_keras_model(self.model, granularity='model')
         """ config['LayerName']['softmax']['exp_table_t'] = 'ap_fixed<32,8>'
         config['LayerName']['softmax']['inv_table_t'] = 'ap_fixed<32,4>'
-        for layer in ['fc1', 'relu1', 'output']:
-            config['LayerName'][layer]['ReuseFactor'] = 64 """
+        for layer in ['relu1', 'softmax']:
+            config['LayerName'][layer]['ReuseFactor'] = 784 """
         
         print(bcolors.OKGREEN + " # INFO: Is using part number "+str(self.use_part)+bcolors.WHITE)
         print(bcolors.OKGREEN + " # INFO: fpga part number     "+self.fpga_part_number+bcolors.WHITE)
@@ -170,7 +183,7 @@ class Trainer:
         print(bcolors.OKGREEN + " # Supported boards: "+str(supported_boards)+bcolors.WHITE)
         hls4ml.templates.get_backend('VivadoAccelerator').create_initial_config()
         self.hls_model.build(csim=False, synth=True, export=True)
-        #hls4ml.templates.VivadoAcceleratorBackend.make_bitfile(self.hls_model)
+        hls4ml.templates.VivadoAcceleratorBackend.make_bitfile(self.hls_model)
 
 parser = argparse.ArgumentParser(description="Arguments for training nn", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-d", "--dataset", help="dataset name")
@@ -206,124 +219,3 @@ t.exec_train()
 t.exec_test()
 t.build_model_fpga()
 sys.exit()
-
-'''
-Each image of the MNIST dataset is encoded in a 784 dimensional vector, 
-representing a 28 x 28 pixel image. Each pixel has a value between 0 and 255, 
-corresponding to the grey-value of a pixel
-'''
- 
-datasets = ["mnist_784", "CIFAR_10"]
- 
-download_data = False
- 
-ssl._create_default_https_context = ssl._create_unverified_context
- 
-seed = 0
-np.random.seed(seed)
-tf.random.set_seed(seed)
-os.environ['PATH'] = '/tools/Xilinx/Vivado/2019.2/bin:' + os.environ['PATH']
- 
-if download_data:
-    data = fetch_openml('CIFAR_10')
-    X, y = data['data'], data['target']
- 
-    print(data['feature_names'])
-    print(X.shape, y.shape)
-    print(X[:5])
-    print(y[:5])
- 
-    le = LabelEncoder()
-    y = le.fit_transform(y)
-    y = to_categorical(y, 10)
-    X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    print(y[:5])
- 
-    scaler = StandardScaler()
-    X_train_val = scaler.fit_transform(X_train_val)
-    X_test = scaler.transform(X_test)
- 
-    np.save('X_train_val.npy', X_train_val)
-    np.save('X_test.npy', X_test)
-    np.save('y_train_val.npy', y_train_val)
-    np.save('y_test.npy', y_test)
-    np.save('classes.npy', le.classes_)
- 
-X_train_val = np.load("X_train_val.npy")
-X_test = np.load("X_test.npy")
-y_train_val = np.load("y_train_val.npy")
-y_test = np.load("y_test.npy")
-classes = np.load("classes.npy",allow_pickle=True)
- 
- 
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Activation, BatchNormalization
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.regularizers import l1
- 
-model = Sequential()
-# 3072 is computed for cifar_10 by 32x32 (width and height of images) multily by 3 which are the color channels 
-model.add(Dense(64, input_shape=(3072,), name='fc1', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-model.add(Activation(activation='relu', name='relu1'))
-model.add(Dense(32, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-model.add(Activation(activation='relu', name='relu2'))
-model.add(Dense(32, name='fc3', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-model.add(Activation(activation='relu', name='relu3'))
-model.add(Dense(10, name='output', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-model.add(Activation(activation='softmax', name='softmax'))
- 
-train = True
-if train:
-    adam = Adam(lr=0.0001)
-    model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
-    model.fit(X_train_val, y_train_val, batch_size=1024,
-              epochs=15, validation_split=0.25, shuffle=True)
-else:
-    from tensorflow.keras.models import load_model
-    model = load_model('model_1/KERAS_check_best_model.h5')
- 
-import plotting
-import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score
- 
-y_keras = model.predict(X_test)
-print("Accuracy: {}".format(accuracy_score(np.argmax(y_test, axis=1), np.argmax(y_keras, axis=1))))
-plt.figure(figsize=(9,9))
-_ = plotting.makeRoc(y_test, y_keras, classes)
-plt.show()
- 
-# xc7z010clg400-1
- 
-import hls4ml
-config = hls4ml.utils.config_from_keras_model(model, granularity='model')
-print("-----------------------------------")
-print("Configuration")
-plotting.print_dict(config)
-print("-----------------------------------")
-hls_model = hls4ml.converters.convert_from_keras_model(model,
-                                                       hls_config=config,
-                                                       output_dir='model_1/hls4ml_prj',
-                                                       part='xc7z010clg400-1')
- 
-hls4ml.utils.plot_model(hls_model, show_shapes=True, show_precision=True, to_file=None)
-hls_model.compile()
-X_test = np.ascontiguousarray(X_test)
-y_hls = hls_model.predict(X_test)
- 
-print("Keras  Accuracy: {}".format(accuracy_score(np.argmax(y_test, axis=1), np.argmax(y_keras, axis=1))))
-print("hls4ml Accuracy: {}".format(accuracy_score(np.argmax(y_test, axis=1), np.argmax(y_hls, axis=1))))
- 
-fig, ax = plt.subplots(figsize=(9, 9))
-_ = plotting.makeRoc(y_test, y_keras, classes)
-plt.gca().set_prop_cycle(None) # reset the colors
-_ = plotting.makeRoc(y_test, y_hls, classes, linestyle='--')
- 
-from matplotlib.lines import Line2D
-lines = [Line2D([0], [0], ls='-'),
-         Line2D([0], [0], ls='--')]
-from matplotlib.legend import Legend
-leg = Legend(ax, lines, labels=['keras', 'hls4ml'],
-            loc='lower right', frameon=False)
-ax.add_artist(leg)
- 
-hls_model.build(csim=False)
