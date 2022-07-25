@@ -53,6 +53,7 @@ class Trainer:
         self.model = None
         self.hls_model = None
         self.use_part = True
+        self.classes_len = 0
     
     def initialize(self) -> None:
         
@@ -107,6 +108,38 @@ class Trainer:
             self.classes = np.load("datasets/"+dataset+'_classes.npy', allow_pickle=True)
             
 
+    def build_model(self, m_type):
+        if m_type == "MLP":
+            self.model = Sequential()
+            self.model.add(Dense(1, input_shape=(self.X_train_val.shape[1],), name='fc1', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+            self.model.add(Activation(activation='relu', name='relu1'))
+            self.model.add(Dense(32, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+            self.model.add(Activation(activation='relu', name='relu2'))
+            # self.model.add(Dense(32, name='fc3', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+            # self.model.add(Activation(activation='relu', name='relu3'))
+            self.model.add(Dense(self.classes_len, name='output', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+            self.model.add(Activation(activation='softmax', name='softmax'))
+
+            adam = Adam(lr=0.0001)
+            self.model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
+        
+        elif m_type == "CNN":
+            
+            from tensorflow.keras import layers
+            
+            self.model = models.Sequential()
+            self.model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)))
+            self.model.add(layers.MaxPooling2D((2, 2)))
+            self.model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+            self.model.add(layers.MaxPooling2D((2, 2)))
+            self.model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+            self.model.add(layers.Flatten())
+            self.model.add(layers.Dense(64, activation='relu'))
+            self.model.add(layers.Dense(self.classes_len))
+            
+            adam = Adam(lr=0.0001)
+            self.model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
+
     def exec_train(self):
 
         file_exists = os.path.exists('models/'+self.dataset+'_KERAS_model.h5')
@@ -122,22 +155,11 @@ class Trainer:
             return
         
         unique = np.unique(self.y_train_val)
-        classes_len = len(self.classes)
+        self.classes_len = len(self.classes)
 
         print(bcolors.OKGREEN + " # Input shape is: "+str(self.X_train_val.shape)+bcolors.WHITE)
 
-        self.model = Sequential()
-        self.model.add(Dense(1, input_shape=(self.X_train_val.shape[1],), name='fc1', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-        self.model.add(Activation(activation='relu', name='relu1'))
-        self.model.add(Dense(32, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-        self.model.add(Activation(activation='relu', name='relu2'))
-        # self.model.add(Dense(32, name='fc3', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-        # self.model.add(Activation(activation='relu', name='relu3'))
-        self.model.add(Dense(classes_len, name='output', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-        self.model.add(Activation(activation='softmax', name='softmax'))
-
-        adam = Adam(lr=0.0001)
-        self.model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
+        self.build_model("CNN")
         
         print(bcolors.OKGREEN + " # INFO: Start model training ... "+bcolors.WHITE)
         self.model.fit(self.X_train_val, self.y_train_val, batch_size=int(self.X_train_val.shape[1]*10), epochs=10, validation_split=0.25, shuffle=True)
