@@ -131,8 +131,8 @@ class Trainer:
         self.model.add(Activation(activation='relu', name='relu1'))
         self.model.add(Dense(32, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
         self.model.add(Activation(activation='relu', name='relu2'))
-        self.model.add(Dense(32, name='fc3', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-        self.model.add(Activation(activation='relu', name='relu3'))
+        # self.model.add(Dense(32, name='fc3', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+        # self.model.add(Activation(activation='relu', name='relu3'))
         self.model.add(Dense(classes_len, name='output', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
         self.model.add(Activation(activation='softmax', name='softmax'))
 
@@ -147,15 +147,20 @@ class Trainer:
 
     def exec_test(self):
         print(self.model.summary())
+        input()
         y_keras = self.model.predict(self.X_test)
         accuracy = format(accuracy_score(np.argmax(self.y_test, axis=1), np.argmax(y_keras, axis=1)))
         print(bcolors.OKGREEN + " # INFO: Accuracy is "+accuracy+bcolors.WHITE)
 
     def build_model_fpga(self):
-        config = hls4ml.utils.config_from_keras_model(self.model, granularity='model')
-        """ config['LayerName']['softmax']['exp_table_t'] = 'ap_fixed<32,8>'
-        config['LayerName']['softmax']['inv_table_t'] = 'ap_fixed<32,4>'
-        for layer in ['relu1', 'softmax']:
+        config = hls4ml.utils.config_from_keras_model(self.model, granularity='name')
+        """ config['LayerName']['fc1']['exp_table_t'] = 'ap_fixed<8,6>'
+        config['LayerName']['fc1']['inv_table_t'] = 'ap_fixed<8,6>'
+        config['LayerName']['fc2']['exp_table_t'] = 'ap_fixed<8,6>'
+        config['LayerName']['fc2']['inv_table_t'] = 'ap_fixed<8,6>'
+        config['LayerName']['softmax']['exp_table_t'] = 'ap_fixed<8,6>'
+        config['LayerName']['softmax']['inv_table_t'] = 'ap_fixed<8,6>' """
+        """ for layer in ['relu1', 'softmax']:
             config['LayerName'][layer]['ReuseFactor'] = 784 """
         
         print(bcolors.OKGREEN + " # INFO: Is using part number "+str(self.use_part)+bcolors.WHITE)
@@ -183,7 +188,7 @@ class Trainer:
         print(bcolors.OKGREEN + " # Supported boards: "+str(supported_boards)+bcolors.WHITE)
         hls4ml.templates.get_backend('VivadoAccelerator').create_initial_config()
         self.hls_model.build(csim=False, synth=True, export=True)
-        hls4ml.templates.VivadoAcceleratorBackend.make_bitfile(self.hls_model)
+        #hls4ml.templates.VivadoAcceleratorBackend.make_bitfile(self.hls_model)
 
 parser = argparse.ArgumentParser(description="Arguments for training nn", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-d", "--dataset", help="dataset name")
