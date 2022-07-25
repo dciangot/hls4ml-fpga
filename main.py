@@ -161,6 +161,8 @@ class Trainer:
 
         self.build_model("CNN")
         
+        self.X_train_val = self.X_train_val.reshape((self.X_train_val.shape[0], 28, 28, 1))
+        
         print(bcolors.OKGREEN + " # INFO: Start model training ... "+bcolors.WHITE)
         self.model.fit(self.X_train_val, self.y_train_val, batch_size=int(self.X_train_val.shape[1]*10), epochs=10, validation_split=0.25, shuffle=True)
         
