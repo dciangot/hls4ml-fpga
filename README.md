@@ -27,6 +27,7 @@ This guide does not focus on evaluating the accuracy performance of the neural n
 [5]: https://docs.conda.io/en/latest/
 [6]: https://www.openml.org/
 [7]: https://www.openml.org/search?type=data&status=active&id=42468
+[8]: https://github.com/KhronosGroup/NNEF-Tools
 
 ##### STEP 0: Check requirements
 First of all you need a basic knowledge of using Vivado and programming in Python.
@@ -126,5 +127,24 @@ scp models_fpga/hls4ml_lhc_jets_hlf_hls4ml_prj/axi_stream_driver.py xilinx@10.2.
 For the second part, check the notebook called **1_NN.ipynb** under the *notebooks* directory.
 
 
+
+-----
+If you want to export the model in **NNEF** format, it is necessary to use the **freeze_graph.py** provided by the tensorflow library in order to export correctly the nn model in **protobuf** format.
+First of all, check where tensorflow is installed with: 
+```
+pip3 show tensorflow
+```
+Than, change directory and go inside tensorflow folder: 
+```
+cd ../anaconda3/envs/hls4ml-env/lib/python3.8/site-packages/tensorflow
+```
+Than, exec the following command to create the *protobuf* starting from the last checkpoint model saved during training phase:
+```
+python3 python/tools/freeze_graph.py --input_meta_graph=/path/to/hls4ml_lhc_jets_hlf_KERAS_model.meta --input_checkpoint=/path/to/hls4ml-fpga/models/hls4ml_lhc_jets_hlf/training/cp.ckpt --output_graph=/tmp/keras_frozen.pb --output_node_names="activation_2/Softmax" --input_binary=true
+```
+Use the **[nnef tools][5]** to export the newly created protobuf to nnef
+```
+python3 -m nnef_tools.convert --input-format tf --output-format nnef --input-model /tmp/keras_frozen.pb --output-model my_model.nnef --input-shapes "{'dense_input': (1, 16)}"
+```
 
 
