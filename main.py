@@ -2,17 +2,17 @@ from tensorflow.keras.utils import to_categorical
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, load_model, save_model
 from tensorflow.keras.layers import Dense, Activation, BatchNormalization
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l1
 import numpy as np
 import os
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import ssl
 import sys
 import argparse
-from tensorflow.keras.models import load_model, save_model
 from sklearn.metrics import accuracy_score
 import hls4ml
 import matplotlib.pyplot as plt
@@ -31,8 +31,9 @@ class bcolors:
 
 class Trainer:
 
-    def __init__(self, fpga_part_number) -> None:
+    def __init__(self, fpga_part_number, nn_model_type) -> None:
         
+        self.nn_model_type = nn_model_type
         self.fpga_part_number = fpga_part_number
         self.available_datasets = [
             "mnist_784", 
@@ -41,7 +42,16 @@ class Trainer:
             "Fashion-MNIST",
             "hls4ml_lhc_jets_hlf",
             "shuttle-landing-control",
-            "climate-model-simulation-crashes"]
+            "climate-model-simulation-crashes",
+            "monks-problems-2",
+            "diabetes",
+            "pc4",
+            "madelon",
+            "scene", 
+            "PhishingWebsites",
+            "optdigits",
+            "higgs",
+            "dna"]
         self.dataset = None
         self.vivado_path = '/tools/Xilinx/Vivado/2019.2/bin:'
         self.seed = 0
@@ -54,12 +64,13 @@ class Trainer:
         self.hls_model = None
         self.use_part = True
         self.classes_len = 0
-    
+        self.train_size = 0
+
     def initialize(self) -> None:
         
         ssl._create_default_https_context = ssl._create_unverified_context
         np.random.seed(self.seed)
-        tf.random.set_seed(self.seed)
+        tf.random.set_random_seed(self.seed)
         os.environ['PATH'] = self.vivado_path + os.environ['PATH']
 
     def setup_data(self, dataset) -> None:
@@ -108,40 +119,22 @@ class Trainer:
             self.classes = np.load("datasets/"+dataset+'_classes.npy', allow_pickle=True)
             
 
-    def build_model(self, m_type):
-        if m_type == "MLP":
+    def build_model(self):
+        if self.nn_model_type == "MLP":
             self.model = Sequential()
-            self.model.add(Dense(1, input_shape=(self.X_train_val.shape[1],), name='fc1', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-            self.model.add(Activation(activation='relu', name='relu1'))
-            self.model.add(Dense(32, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-            self.model.add(Activation(activation='relu', name='relu2'))
-            # self.model.add(Dense(32, name='fc3', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-            # self.model.add(Activation(activation='relu', name='relu3'))
+            self.model.add(Dense(4, input_shape=(self.X_train_val.shape[1],), kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+            self.model.add(Activation(activation='relu'))
+            self.model.add(Dense(8, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+            self.model.add(Activation(activation='relu'))
             self.model.add(Dense(self.classes_len, name='output', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-            self.model.add(Activation(activation='softmax', name='softmax'))
+            self.model.add(Activation(activation='softmax'))
 
             adam = Adam(lr=0.0001)
             self.model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
         
-        elif m_type == "CNN":
-            
-            from tensorflow.keras import layers
-            
-            self.model = Sequential()
-            self.model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)))
-            self.model.add(layers.MaxPooling2D((2, 2)))
-            self.model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-            self.model.add(layers.MaxPooling2D((2, 2)))
-            self.model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-            self.model.add(layers.Flatten())
-            self.model.add(layers.Dense(64, activation='relu'))
-            self.model.add(layers.Dense(self.classes_len))
-            
-            adam = Adam(lr=0.0001)
-            self.model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
+        # WIP: to handle more model type
 
     def exec_train(self):
-
         file_exists = os.path.exists('models/'+self.dataset+'_KERAS_model.h5')
         user_reply = ""
         if file_exists:
@@ -158,34 +151,42 @@ class Trainer:
         self.classes_len = len(self.classes)
 
         print(bcolors.OKGREEN + " # Input shape is: "+str(self.X_train_val.shape)+bcolors.WHITE)
+        self.train_size = self.X_train_val.shape[0]
 
-        self.build_model("CNN")
-        
-        self.X_train_val = self.X_train_val.reshape((self.X_train_val.shape[0], 28, 28, 1))
-        
+        self.build_model()
+
+        checkpoint_path = 'models/'+self.dataset+'/training/cp.ckpt'
+        checkpoint_dir = os.path.dirname(checkpoint_path)
+
+        cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                save_weights_only=True,
+                                                verbose=1)
+
         print(bcolors.OKGREEN + " # INFO: Start model training ... "+bcolors.WHITE)
-        self.model.fit(self.X_train_val, self.y_train_val, batch_size=int(self.X_train_val.shape[1]*10), epochs=10, validation_split=0.25, shuffle=True)
+        self.model.fit(
+            self.X_train_val, 
+            self.y_train_val, 
+            batch_size=int(self.X_train_val.shape[1]*10), 
+            epochs=20, 
+            validation_split=0.25, 
+            shuffle=True,
+            callbacks=[cp_callback])
         
+        print(bcolors.OKGREEN + " # input name", self.model.input.op.name+bcolors.WHITE)
+        print(bcolors.OKGREEN + " # output name", self.model.output.op.name+bcolors.WHITE)
         print(bcolors.OKGREEN + " # INFO: Training finished, saved model path: "+'models/'+self.dataset+'_KERAS_model.h5'+bcolors.WHITE)
-        save_model(self.model, 'models/'+self.dataset+'_KERAS_model.h5')
+        self.model.save('models/'+self.dataset+'/model.h5')
+        meta_graph_def = tf.train.export_meta_graph(filename='models/'+self.dataset+'_KERAS_model.meta')
 
     def exec_test(self):
         print(self.model.summary())
-        input()
+        input(bcolors.OKGREEN+" # INFO: press enter to continue"+bcolors.WHITE)
         y_keras = self.model.predict(self.X_test)
         accuracy = format(accuracy_score(np.argmax(self.y_test, axis=1), np.argmax(y_keras, axis=1)))
         print(bcolors.OKGREEN + " # INFO: Accuracy is "+accuracy+bcolors.WHITE)
 
     def build_model_fpga(self):
         config = hls4ml.utils.config_from_keras_model(self.model, granularity='name')
-        """ config['LayerName']['fc1']['exp_table_t'] = 'ap_fixed<8,6>'
-        config['LayerName']['fc1']['inv_table_t'] = 'ap_fixed<8,6>'
-        config['LayerName']['fc2']['exp_table_t'] = 'ap_fixed<8,6>'
-        config['LayerName']['fc2']['inv_table_t'] = 'ap_fixed<8,6>'
-        config['LayerName']['softmax']['exp_table_t'] = 'ap_fixed<8,6>'
-        config['LayerName']['softmax']['inv_table_t'] = 'ap_fixed<8,6>' """
-        """ for layer in ['relu1', 'softmax']:
-            config['LayerName'][layer]['ReuseFactor'] = 784 """
         
         print(bcolors.OKGREEN + " # INFO: Is using part number "+str(self.use_part)+bcolors.WHITE)
         print(bcolors.OKGREEN + " # INFO: fpga part number     "+self.fpga_part_number+bcolors.WHITE)
@@ -218,10 +219,12 @@ parser = argparse.ArgumentParser(description="Arguments for training nn", format
 parser.add_argument("-d", "--dataset", help="dataset name")
 parser.add_argument("-b", "--fpga_board_number", help="fpga board number")
 parser.add_argument("-f", "--fpga_part_number", help="fpga part number")
+parser.add_argument("-m", "--nn_model_type", help="neural network architecture")
 args = vars(parser.parse_args())
 dataset_name = args["dataset"]
 fpga_part_number = args["fpga_part_number"]
 fpga_board_number = args["fpga_board_number"]
+nn_model_type = args["nn_model_type"]
 
 if dataset_name == None or len(dataset_name.replace(" ", "")) == 0:
     print(" # ERROR: No dataset name has been specified. ")
@@ -235,7 +238,10 @@ elif fpga_board_number != None:
     fpga_part_number = fpga_board_number
     use_part = False
 
-t = Trainer(fpga_part_number)
+if nn_model_type == None:
+    nn_model_type = "MLP"
+
+t = Trainer(fpga_part_number, nn_model_type)
 t.use_part = use_part
 t.initialize()
 try:
