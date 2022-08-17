@@ -104,6 +104,7 @@ Finally, generate the bitstream using the button show in the figure below:
     margin-left: auto;
     margin-right: auto;
     width: 60%;"/> 
+
 This will run the synthesis, implementation and bitstream code generation.
 
 ##### STEP 4: Copy the generated files on EBAZ4205
