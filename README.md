@@ -65,12 +65,14 @@ Open vivado and create a new project specifying the part number of the ebaz4205 
     margin-left: auto;
     margin-right: auto;
     width: 60%;"/> 
+    
 Then, go to **Tools** -> **Settings** and under **IP** -> **Repository** click the plus button and add the absolute path for **_models_fpga/hls4ml_lhc_jets_hlf_hls4ml_prj/myproject_prj/solution1/impl_**. Vivado will detect the IP (if there is one) as show in the imabe below:
 
 <img src="/images/2_addip.png" alt="EBAZ4205" style="display: block;
     margin-left: auto;
     margin-right: auto;
-    width: 60%;"/> 
+    width: 60%;"/>
+    
 In this github repo, under the *resources* directory there is a block design file fully functional and ready to use, just import it and that's it.
 Go to **Ip Integrator** -> **Import block design** and select the block design in the resources directory.
 The block design should look like the following:
@@ -88,12 +90,14 @@ Import the **constraint** file for the ebaz4205 as show in the image below:
     margin-left: auto;
     margin-right: auto;
     width: 60%;"/> 
+    
 Then, right click on **design_1_i** and select **Create HDL Wrapper**. 
 
 <img src="/images/4_hdlwrapper.png" alt="EBAZ4205" style="display: block;
     margin-left: auto;
     margin-right: auto;
     width: 60%;"/> 
+    
 Finally, generate the bitstream using the button show in the figure below:
 
 <img src="/images/5_bitstream.png" alt="EBAZ4205" style="display: block;
