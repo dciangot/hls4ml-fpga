@@ -1,0 +1,26 @@
+{
+    "network": {
+        "arch": [
+            {
+                "layer_name": "l1",
+                "activation_function": "relu",
+                "neurons": 4
+            },
+            {
+                "layer_name": "l2",
+                "activation_function": "relu",
+                "neurons": 8
+            }
+        ],
+        "training": {
+            "epochs": 10,
+            "optimizer": "Adam",
+            "loss": "categorical_crossentropy",
+            "metrics": "accuracy",
+            "learning_rate": 0.0001,
+            "batch_size": "default",
+            "validation_split": "default",
+            "shuffle": "true"
+        }
+    }
+}

@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from tensorflow.keras.models import Sequential, load_model, save_model
 from tensorflow.keras.layers import Dense, Activation, BatchNormalization
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, Adagrad
 from tensorflow.keras.regularizers import l1
 import numpy as np
 import os
@@ -16,6 +16,8 @@ import argparse
 from sklearn.metrics import accuracy_score
 import hls4ml
 import matplotlib.pyplot as plt
+import json
+from os.path import exists
 
 class bcolors:
     WHITE = '\033[97m'
@@ -31,7 +33,7 @@ class bcolors:
 
 class Trainer:
 
-    def __init__(self, fpga_part_number, nn_model_type) -> None:
+    def __init__(self, fpga_part_number, nn_model_type):
         
         self.nn_model_type = nn_model_type
         self.fpga_part_number = fpga_part_number
@@ -65,6 +67,7 @@ class Trainer:
         self.use_part = True
         self.classes_len = 0
         self.train_size = 0
+        self.network_spec = None
 
     def initialize(self) -> None:
         
@@ -119,19 +122,52 @@ class Trainer:
             self.classes = np.load("datasets/"+dataset+'_classes.npy', allow_pickle=True)
             
 
+    def parse_network_specifics(self):
+        
+        try:
+            f = open('specifics.json')
+            self.network_spec = json.load(f)
+        except:
+            return
+
     def build_model(self):
         if self.nn_model_type == "MLP":
+
             self.model = Sequential()
-            self.model.add(Dense(4, input_shape=(self.X_train_val.shape[1],), kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-            self.model.add(Activation(activation='relu'))
-            self.model.add(Dense(8, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-            self.model.add(Activation(activation='relu'))
+
+            self.parse_network_specifics()
+
+            if self.network_spec == None:
+                self.model.add(Dense(4, input_shape=(self.X_train_val.shape[1],), kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+                self.model.add(Activation(activation='relu'))
+                self.model.add(Dense(8, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+                self.model.add(Activation(activation='relu'))
+                opt = Adam(lr=0.0001)
+            else:
+                arch = self.network_spec["network"]["arch"]
+                for i in range(0, len(arch)):
+                    layer_name = self.network_spec["network"]["arch"][i]["layer_name"]
+                    activation_function = self.network_spec["network"]["arch"][i]["activation_function"]
+                    neurons = self.network_spec["network"]["arch"][i]["neurons"]
+                    if i == 0:
+                        self.model.add(Dense(neurons, input_shape=(self.X_train_val.shape[1],), kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+                    else:
+                        self.model.add(Dense(neurons, name=layer_name, kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+                    self.model.add(Activation(activation=activation_function))
+
+                if  self.network_spec["network"]["training"]["optimizer"] == "Adam":
+                    opt = Adam(lr=0.0001)
+                elif self.network_spec["network"]["training"]["optimizer"] == "Adagrad":
+                    opt = Adagrad(lr=0.0001)
+                else:
+                    opt = Adam(lr=0.0001)
+                # handle more opt
+                
             self.model.add(Dense(self.classes_len, name='output', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
             self.model.add(Activation(activation='softmax'))
 
-            adam = Adam(lr=0.0001)
-            self.model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
-        
+            self.model.compile(optimizer=opt, loss=['categorical_crossentropy'], metrics=['accuracy'])
+
         # WIP: to handle more model type
 
     def exec_train(self):
@@ -162,16 +198,44 @@ class Trainer:
                                                 save_weights_only=True,
                                                 verbose=1)
 
-        print(bcolors.OKGREEN + " # INFO: Start model training ... "+bcolors.WHITE)
-        self.model.fit(
-            self.X_train_val, 
-            self.y_train_val, 
-            batch_size=int(self.X_train_val.shape[1]*10), 
-            epochs=20, 
-            validation_split=0.25, 
-            shuffle=True,
-            callbacks=[cp_callback])
+        if self.network_spec == None:
+            print(bcolors.OKGREEN + " # INFO: Start model training with networks specs ... "+bcolors.WHITE)
+            self.model.fit(
+                self.X_train_val, 
+                self.y_train_val, 
+                batch_size=int(self.X_train_val.shape[1]*10), 
+                epochs=20, 
+                validation_split=0.25, 
+                shuffle=True,
+                callbacks=[cp_callback])
+        else:
+            print(bcolors.OKGREEN + " # INFO: Start model training with networks specs ... "+bcolors.WHITE)
+            batch_size = int(self.X_train_val.shape[1]*10) if self.network_spec["network"]["training"]["batch_size"] == "default" else int(self.network_spec["network"]["training"]["batch_size"])
+            epochs = int(self.network_spec["network"]["training"]["epochs"])
+            validation_split = 0.25 if self.network_spec["network"]["training"]["validation_split"] == "default" else float(self.network_spec["network"]["training"]["validation_split"])
+            shuffle = True if self.network_spec["network"]["training"]["shuffle"] == "true" else False
+
+            self.model.fit(
+                self.X_train_val, 
+                self.y_train_val, 
+                batch_size=batch_size, 
+                epochs=epochs, 
+                validation_split=validation_split, 
+                shuffle=shuffle,
+                callbacks=[cp_callback])
         
+        tf.keras.utils.plot_model(
+            self.model,
+            to_file='models/'+self.dataset+'/model.png',
+            show_shapes=True,
+            show_dtype=True,
+            show_layer_names=True,
+            rankdir='TB',
+            expand_nested=True,
+            dpi=96,
+            layer_range=None,
+            show_layer_activations=True
+        )
         print(bcolors.OKGREEN + " # input name", self.model.input.op.name+bcolors.WHITE)
         print(bcolors.OKGREEN + " # output name", self.model.output.op.name+bcolors.WHITE)
         print(bcolors.OKGREEN + " # INFO: Training finished, saved model path: "+'models/'+self.dataset+'_KERAS_model.h5'+bcolors.WHITE)

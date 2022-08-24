@@ -8,6 +8,7 @@
 </div>
 
 ##### This is a step by step tutorial on how to deploy a simple MLP neural network on EBAZ4205 fpga.
+This small project is part of a larger research project whose aim is the implementation of neural networks on FPGAs using **[Bondmachine][9]**, a new highly parallel and heterogeneous innovative architecture (you can learn more [here][10]).
 The following libraries and tools have been used in order to achieve the goal:
 
 - [hls4ml][1]
@@ -28,6 +29,8 @@ This guide does not focus on evaluating the accuracy performance of the neural n
 [6]: https://www.openml.org/
 [7]: https://www.openml.org/search?type=data&status=active&id=42468
 [8]: https://github.com/KhronosGroup/NNEF-Tools
+[9]: http://bondmachine.fisica.unipg.it/
+[10]: https://www.sciencedirect.com/science/article/pii/S0167819121001150
 
 ##### STEP 0: Check requirements
 First of all you need a basic knowledge of using Vivado and programming in Python.
@@ -55,7 +58,7 @@ Here the dataset specified is **hls4ml_lhc_jets_hlf** whose specifications can b
 You can also specify the type of neural network (at the moment is only supported a simple neural network with a bunch of dense layer).
 If the dataset has already been downloaded, you will be asked if you want to download it again. The same is for the neural network model, if it already exists you will be asked if you want to train it again. 
 In the near future more commands line options will be supported, for example training epochs, batch size, DNN architecture (i.e. number of layers and nodes, activation functions, ...).
-The default model is a MLP sequential model with one hidden layer, this means three layers in total (input layer, hidden dense layer, output layer).
+The default model is a MLP sequential model with two hidden layer, this means four layers in total (input layer, first hidden dense layer, second hidden dense layer, output layer).
 The neural network model architecture is very basic, the goal of this guide is to deploy the ML model on the FPGA and moreover the resources of the EBAZ4205 are very limited. In fact, the FPGA resources in terms of **LUTS**, **BRAM** and **FLIPFLOP** essentially depend on two factors: the complexity of the model and the **number of features** of the dataset. Regarding the latter, a study was carried out on the occupation of FPGA resources using the same neural network as the dataset varies, which has shown that the occupation of FPGA resources grows with respect to the number of features.
 Wait for the command to complete. If all went well, under the folder **_models_fpga/hls4ml_lhc_jets_hlf_hls4ml_prj/myproject_prj/solution1/impl_** there will be the newly created ip.
 

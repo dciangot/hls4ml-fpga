@@ -4,3 +4,4 @@ models_fpga/
 NNEF-Tools/
 reports/
 utils.txt
+read_graph.py
