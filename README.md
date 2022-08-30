@@ -63,6 +63,7 @@ The default model is a MLP sequential model fully connected with n hidden layer.
     margin-left: auto;
     margin-right: auto;
     width: 80%;"/> 
+    
 The neural network model architecture is very basic, the goal of this guide is to deploy the ML model on the FPGA and moreover the resources of the EBAZ4205 are very limited. In fact, the FPGA resources in terms of **LUTS**, **BRAM** and **FLIPFLOP** essentially depend on two factors: the complexity of the model and the **number of features** of the dataset. Regarding the latter, a study was carried out on the occupation of FPGA resources using the same neural network as the dataset varies, which has shown that the occupation of FPGA resources grows with respect to the number of features.
 Wait for the command to complete. If all went well, under the folder **_models_fpga/hls4ml_lhc_jets_hlf_hls4ml_prj/myproject_prj/solution1/impl_** there will be the newly created ip.
 
