@@ -18,6 +18,9 @@ import hls4ml
 import matplotlib.pyplot as plt
 import json
 from os.path import exists
+import networkx as nx
+import pylab
+from networkx.drawing.nx_agraph import graphviz_layout
 
 class bcolors:
     WHITE = '\033[97m'
@@ -107,6 +110,7 @@ class Trainer:
             self.X_test = scaler.transform(self.X_test)
             self.classes = self.le.classes_
 
+            
             np.save("datasets/"+dataset+'_X_train_val.npy', self.X_train_val)
             np.save("datasets/"+dataset+'_X_test.npy', self.X_test)
             np.save("datasets/"+dataset+'_y_train_val.npy', self.y_train_val)
@@ -138,10 +142,17 @@ class Trainer:
             self.parse_network_specifics()
 
             if self.network_spec == None:
-                self.model.add(Dense(4, input_shape=(self.X_train_val.shape[1],), kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-                self.model.add(Activation(activation='relu'))
-                self.model.add(Dense(8, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-                self.model.add(Activation(activation='relu'))
+                self.model.add(Dense(1, input_shape=(self.X_train_val.shape[1],)))
+                # self.model.add(Dense(10, input_shape=(self.X_train_val.shape[1],)))
+                # self.model.add(Dense(15, input_shape=(self.X_train_val.shape[1],)))
+                # self.model.add(Dense(20, input_shape=(self.X_train_val.shape[1],)))
+                # self.model.add(Dense(15, input_shape=(self.X_train_val.shape[1],)))
+                # self.model.add(Dense(10, input_shape=(self.X_train_val.shape[1],)))
+                #for i in range(1, 2):
+                #    self.model.add(Dense(i, input_shape=(self.X_train_val.shape[1],)))
+                # self.model.add(Activation(activation='relu'))
+                # self.model.add(Dense(8, name='fc2', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+                # self.model.add(Activation(activation='relu'))
                 opt = Adam(lr=0.0001)
             else:
                 arch = self.network_spec["network"]["arch"]
@@ -152,8 +163,8 @@ class Trainer:
                     if i == 0:
                         self.model.add(Dense(neurons, input_shape=(self.X_train_val.shape[1],), kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
                     else:
-                        self.model.add(Dense(neurons, name=layer_name, kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-                    self.model.add(Activation(activation=activation_function))
+                        self.model.add(Dense(neurons, activation=activation_function, name=layer_name, kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+                    #self.model.add(Activation(activation=activation_function))
 
                 if  self.network_spec["network"]["training"]["optimizer"] == "Adam":
                     opt = Adam(lr=0.0001)
@@ -163,12 +174,99 @@ class Trainer:
                     opt = Adam(lr=0.0001)
                 # handle more opt
                 
-            self.model.add(Dense(self.classes_len, name='output', kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-            self.model.add(Activation(activation='softmax'))
+                
+            self.model.add(Dense(self.classes_len, activation='softmax'))
 
             self.model.compile(optimizer=opt, loss=['categorical_crossentropy'], metrics=['accuracy'])
 
         # WIP: to handle more model type
+
+    def get_json_model(self):
+
+        import json
+        layers = self.model.layers
+        to_export = {}
+
+        for i in range(0 , len(layers)):
+            layer_info = {}
+            layer_weights = layers[i].get_weights()[0].tolist()
+            bias = layers[i].get_weights()[1]
+
+            flat_layer_weigth = [item for sublist in layer_weights for item in sublist]
+
+            layer_info["weigths"] = flat_layer_weigth
+            layer_info["bias"] = bias.tolist()
+            layer_info["act_func"] = layers[i].activation.__name__
+
+            to_export["layer_"+str(i)] = layer_info
+
+        with open('models/'+self.dataset+'/model.json', 'w') as fp:
+            json.dump(to_export, fp)
+
+
+    def build_graph(self):
+
+        plt.subplots(num=None, figsize=(200, 200), dpi=80, facecolor='w', edgecolor='k')
+        G = nx.DiGraph()
+
+        layers = self.model.layers
+        weights = self.model.weights
+
+        layer_index = 0
+        layers_hist = []
+        edge_list = []
+        pos = {}
+
+        max_layer_size = 0
+        for layer in layers:
+            layer_units = layer.units
+            if layer_units > max_layer_size:
+                max_layer_size = layer_units
+
+        positions = []
+        for k in range(0, int(max_layer_size)*2):
+            positions.append(k)
+            if k > 0:
+                positions.append(-k)
+
+        last_pos_used = positions[int(len(positions)/2)]
+        inc_dex = 0
+
+        for layer in layers:
+            layer_weights = layer.get_weights()[0]
+            bias = layer.get_weights()[1]
+            layer_units = layer.units
+
+            if layer_index == 0:
+                for o in range(0, len(bias)):
+                    for k in range(0, len(layer_weights)):
+                        edge_list.append((str(layer_index-1)+"_"+str(k), str(o)+"_"+str(layer_index)))
+                        pos[str(layer_index-1)+"_"+str(k)] = (layer_index-1, positions[k])
+            else:   
+                for m in range(0, layers_hist[layer_index-1]):
+                    node_name = str(m)+"_"+str(layer_index-1)
+                    pos[node_name] = (layer_index-1,positions[m])
+                    
+                    for l in range(0, layer_units):
+                        edge_list.append((node_name, str(l)+"_"+str(layer_index)))
+                        pos[str(l)+"_"+str(layer_index)] = (layer_index,positions[l])
+
+            layer_index = layer_index + 1
+            layers_hist.append(layer_units)
+        
+        G.add_edges_from(edge_list)
+        nx.draw(
+            G,
+            pos = pos, # position of point
+            node_color ='black', # vertex color
+            edge_color ='red', # edge color
+            with_labels = True, # Display vertex labels
+            font_size =8, # text size
+            node_size =800, # vertex size
+            font_color = "white"
+        )
+    
+        plt.show()
 
     def exec_train(self):
         file_exists = os.path.exists('models/'+self.dataset+'_KERAS_model.h5')
@@ -204,7 +302,7 @@ class Trainer:
                 self.X_train_val, 
                 self.y_train_val, 
                 batch_size=int(self.X_train_val.shape[1]*10), 
-                epochs=20, 
+                epochs=1, 
                 validation_split=0.25, 
                 shuffle=True,
                 callbacks=[cp_callback])
@@ -236,8 +334,13 @@ class Trainer:
             layer_range=None,
             show_layer_activations=True
         )
-        print(bcolors.OKGREEN + " # input name", self.model.input.op.name+bcolors.WHITE)
-        print(bcolors.OKGREEN + " # output name", self.model.output.op.name+bcolors.WHITE)
+        
+        self.get_json_model()
+        self.build_graph()
+        
+
+        #print(bcolors.OKGREEN + " # input name", self.model.input.op.name+bcolors.WHITE)
+        #print(bcolors.OKGREEN + " # output name", self.model.output.op.name+bcolors.WHITE)
         print(bcolors.OKGREEN + " # INFO: Training finished, saved model path: "+'models/'+self.dataset+'_KERAS_model.h5'+bcolors.WHITE)
         self.model.save('models/'+self.dataset+'/model.h5')
         meta_graph_def = tf.train.export_meta_graph(filename='models/'+self.dataset+'_KERAS_model.meta')

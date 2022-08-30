@@ -58,7 +58,11 @@ Here the dataset specified is **hls4ml_lhc_jets_hlf** whose specifications can b
 You can also specify the type of neural network (at the moment is only supported a simple neural network with a bunch of dense layer).
 If the dataset has already been downloaded, you will be asked if you want to download it again. The same is for the neural network model, if it already exists you will be asked if you want to train it again. 
 In the near future more commands line options will be supported, for example training epochs, batch size, DNN architecture (i.e. number of layers and nodes, activation functions, ...).
-The default model is a MLP sequential model with two hidden layer, this means four layers in total (input layer, first hidden dense layer, second hidden dense layer, output layer).
+The default model is a MLP sequential model fully connected with n hidden layer.
+<img src="/images/nngraph.png" alt="EBAZ4205" style="display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 80%;"/> 
 The neural network model architecture is very basic, the goal of this guide is to deploy the ML model on the FPGA and moreover the resources of the EBAZ4205 are very limited. In fact, the FPGA resources in terms of **LUTS**, **BRAM** and **FLIPFLOP** essentially depend on two factors: the complexity of the model and the **number of features** of the dataset. Regarding the latter, a study was carried out on the occupation of FPGA resources using the same neural network as the dataset varies, which has shown that the occupation of FPGA resources grows with respect to the number of features.
 Wait for the command to complete. If all went well, under the folder **_models_fpga/hls4ml_lhc_jets_hlf_hls4ml_prj/myproject_prj/solution1/impl_** there will be the newly created ip.
 
@@ -68,14 +72,14 @@ Open vivado and create a new project specifying the part number of the ebaz4205 
 <img src="/images/1_setup.png" alt="EBAZ4205" style="display: block;
     margin-left: auto;
     margin-right: auto;
-    width: 60%;"/> 
+    width: 80%;"/> 
     
 Then, go to **Tools** -> **Settings** and under **IP** -> **Repository** click the plus button and add the absolute path for **_models_fpga/hls4ml_lhc_jets_hlf_hls4ml_prj/myproject_prj/solution1/impl_**. Vivado will detect the IP (if there is one) as show in the imabe below:
 
 <img src="/images/2_addip.png" alt="EBAZ4205" style="display: block;
     margin-left: auto;
     margin-right: auto;
-    width: 60%;"/>
+    width: 80%;"/>
     
 In this github repo, under the *resources* directory there is a block design file fully functional and ready to use, just import it and that's it.
 Go to **Ip Integrator** -> **Import block design** and select the block design in the resources directory.
@@ -84,7 +88,7 @@ The block design should look like the following:
 <img src="/images/6_bd.png" alt="EBAZ4205" style="display: block;
     margin-left: auto;
     margin-right: auto;
-    width: 65%;"/>
+    width: 75%;"/>
 
 As you can see, the overall design is already complete and ready to be used. All components are configured and suitable for generating a bitstream that works for ebaz4205, but you can also build your own design for another ZYNQ-FPGA starting from mine.
 
@@ -93,21 +97,21 @@ Import the **constraint** file for the ebaz4205 as show in the image below:
 <img src="/images/3_addconst.png" alt="EBAZ4205" style="display: block;
     margin-left: auto;
     margin-right: auto;
-    width: 60%;"/> 
+    width: 80%;"/> 
     
 Then, right click on **design_1_i** and select **Create HDL Wrapper**. 
 
 <img src="/images/4_hdlwrapper.png" alt="EBAZ4205" style="display: block;
     margin-left: auto;
     margin-right: auto;
-    width: 60%;"/> 
+    width: 80%;"/> 
     
 Finally, generate the bitstream using the button show in the figure below:
 
 <img src="/images/5_bitstream.png" alt="EBAZ4205" style="display: block;
     margin-left: auto;
     margin-right: auto;
-    width: 60%;"/> 
+    width: 80%;"/> 
 
 This will run the synthesis, implementation and bitstream code generation.
 

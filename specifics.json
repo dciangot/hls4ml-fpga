@@ -3,17 +3,22 @@
         "arch": [
             {
                 "layer_name": "l1",
-                "activation_function": "relu",
-                "neurons": 4
+                "activation_function": "linear",
+                "neurons": 12
             },
             {
                 "layer_name": "l2",
-                "activation_function": "relu",
-                "neurons": 8
+                "activation_function": "linear",
+                "neurons": 24
+            },
+            {
+                "layer_name": "l3",
+                "activation_function": "linear",
+                "neurons": 12
             }
         ],
         "training": {
-            "epochs": 10,
+            "epochs": 5,
             "optimizer": "Adam",
             "loss": "categorical_crossentropy",
             "metrics": "accuracy",
