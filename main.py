@@ -142,7 +142,10 @@ class Trainer:
             self.parse_network_specifics()
 
             if self.network_spec == None:
-                self.model.add(Dense(1, input_shape=(self.X_train_val.shape[1],)))
+                for i in range(0, 24, 3):
+                    self.model.add(Dense(i, input_shape=(self.X_train_val.shape[1],)))
+                for i in reversed(range(0, 24, 3)):
+                    self.model.add(Dense(i, input_shape=(self.X_train_val.shape[1],)))
                 # self.model.add(Dense(10, input_shape=(self.X_train_val.shape[1],)))
                 # self.model.add(Dense(15, input_shape=(self.X_train_val.shape[1],)))
                 # self.model.add(Dense(20, input_shape=(self.X_train_val.shape[1],)))
@@ -161,9 +164,9 @@ class Trainer:
                     activation_function = self.network_spec["network"]["arch"][i]["activation_function"]
                     neurons = self.network_spec["network"]["arch"][i]["neurons"]
                     if i == 0:
-                        self.model.add(Dense(neurons, input_shape=(self.X_train_val.shape[1],), kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+                        self.model.add(Dense(neurons, input_shape=(self.X_train_val.shape[1],), kernel_regularizer=l1(0.0001)))
                     else:
-                        self.model.add(Dense(neurons, activation=activation_function, name=layer_name, kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+                        self.model.add(Dense(neurons, activation=activation_function, name=layer_name, kernel_regularizer=l1(0.0001)))
                     #self.model.add(Activation(activation=activation_function))
 
                 if  self.network_spec["network"]["training"]["optimizer"] == "Adam":
@@ -176,7 +179,6 @@ class Trainer:
                 
                 
             self.model.add(Dense(self.classes_len, activation='softmax'))
-
             self.model.compile(optimizer=opt, loss=['categorical_crossentropy'], metrics=['accuracy'])
 
         # WIP: to handle more model type
@@ -203,6 +205,132 @@ class Trainer:
         with open('models/'+self.dataset+'/model.json', 'w') as fp:
             json.dump(to_export, fp)
 
+    def dump_json_for_bondmachine(self):
+        import json
+
+        layers = self.model.layers
+        weights = self.model.weights
+
+        to_dump = {}
+
+        weights = []
+        nodes = []
+
+        # save weigths
+        for i in range(0 , len(layers)):
+
+            layer_weights = layers[i].get_weights()
+
+            for m in range(0, len(layer_weights)):
+                for w in range(0, len(layer_weights[m])):
+                    try:
+                        for v in range(0, len(layer_weights[m][w])):
+                            weight_info = {
+                                    "Layer": i+1,
+                                    "PosCurrLayer": v,
+                                    "PosPrevLayer": w,
+                                    "Value": float(layer_weights[m][w][v])
+                                }
+                            weights.append(weight_info)
+                    except:
+                        continue
+
+            
+            #print(weights)
+            #flat_layer_weigth = [item for sublist in layer_weights for item in sublist]
+            if i == 0:
+                for units in range(0, layers[i].units):
+                    weights_l0 = layers[i].get_weights()[0]
+                    for w in range(0, len(weights_l0)):
+                        node_info = {
+                            "Layer": 0,
+                            "Pos": w,
+                            "Type": "input",
+                            "Bias": 0
+                        }
+                        nodes.append(node_info)
+                    break
+           
+
+            for units in range(0, layers[i].units):
+                if i == len(layers) - 1:
+                    bias = layers[i].get_weights()[1]
+                    node_info = {
+                        "Layer": i+1,
+                        "Pos": units,
+                        "Type": "summation",
+                        "Bias": bias.tolist()[units]
+                    }
+                    nodes.append(node_info)
+                else:
+                    bias = layers[i].get_weights()[1]
+                    node_info = {
+                        "Layer": i+1,
+                        "Pos": units,
+                        "Type": layers[i].activation.__name__,
+                        "Bias": bias.tolist()[units]
+                    }
+                    nodes.append(node_info)
+
+
+            if i == len(layers) - 1:
+                for l in range(0, len(layer_weights[0][0])):
+                    node_info = {
+                        "Layer": i+2,
+                        "Pos": l,
+                        "Type": "softmax",
+                        "Bias": 0
+                    }
+                    nodes.append(node_info)
+
+
+                layer_weights = layers[i-2].get_weights()
+
+                for k in range(0, layers[i].units):
+                    for l in range(0, layers[i].units):
+                        weight_info = {
+                                        "Layer": i+2,
+                                        "PosCurrLayer": k,
+                                        "PosPrevLayer": l,
+                                        "Value": 1
+                                    }
+                        weights.append(weight_info)
+
+
+            if i == len(layers) - 1:
+                for l in range(0, len(layer_weights[0][0])):
+                    node_info = {
+                        "Layer": i+3,
+                        "Pos": l,
+                        "Type": "output",
+                        "Bias": 0
+                    }
+                    nodes.append(node_info)
+
+                    weight_info = {
+                                    "Layer": i+3,
+                                    "PosCurrLayer": l,
+                                    "PosPrevLayer": l,
+                                    "Value": 1
+                                }
+                    weights.append(weight_info)
+
+
+            # for j in range(0, len(flat_layer_weigth)):
+            #     weight_info = {
+            #         "Layer": i,
+            #         "PosCurrLayer": j,
+            #         "PosPrevLayer": i,
+            #         "Value": flat_layer_weigth[j]
+            #     }
+            #     weights.append(weight_info)
+
+        to_dump["Nodes"] = nodes
+        to_dump["Weights"] = weights
+
+        with open('models/'+self.dataset+'/modelBM.json', 'w') as fp:
+            print(" *** dump model")
+            json.dump(to_dump, fp)
 
     def build_graph(self):
 
@@ -258,11 +386,11 @@ class Trainer:
         nx.draw(
             G,
             pos = pos, # position of point
-            node_color ='black', # vertex color
-            edge_color ='red', # edge color
+            node_color ='blue', # vertex color
+            edge_color ='green', # edge color
             with_labels = True, # Display vertex labels
             font_size =8, # text size
-            node_size =800, # vertex size
+            node_size =750, # vertex size
             font_color = "white"
         )
     
@@ -301,7 +429,7 @@ class Trainer:
             self.model.fit(
                 self.X_train_val, 
                 self.y_train_val, 
-                batch_size=int(self.X_train_val.shape[1]*10), 
+                batch_size=int(self.X_train_val.shape[1]/10), 
                 epochs=1, 
                 validation_split=0.25, 
                 shuffle=True,
@@ -335,10 +463,10 @@ class Trainer:
             show_layer_activations=True
         )
         
+        self.dump_json_for_bondmachine()
         self.get_json_model()
         self.build_graph()
         
-
         #print(bcolors.OKGREEN + " # input name", self.model.input.op.name+bcolors.WHITE)
         #print(bcolors.OKGREEN + " # output name", self.model.output.op.name+bcolors.WHITE)
         print(bcolors.OKGREEN + " # INFO: Training finished, saved model path: "+'models/'+self.dataset+'_KERAS_model.h5'+bcolors.WHITE)
@@ -347,10 +475,13 @@ class Trainer:
 
     def exec_test(self):
         print(self.model.summary())
-        input(bcolors.OKGREEN+" # INFO: press enter to continue"+bcolors.WHITE)
         y_keras = self.model.predict(self.X_test)
+        np.save("datasets/"+self.dataset+'_y_keras.npy', y_keras)
+        # print(self.X_test)
+        # print(y_keras)
         accuracy = format(accuracy_score(np.argmax(self.y_test, axis=1), np.argmax(y_keras, axis=1)))
         print(bcolors.OKGREEN + " # INFO: Accuracy is "+accuracy+bcolors.WHITE)
+        input(bcolors.OKGREEN+" # INFO: press enter to continue"+bcolors.WHITE)
 
     def build_model_fpga(self):
         config = hls4ml.utils.config_from_keras_model(self.model, granularity='name')
