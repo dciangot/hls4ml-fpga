@@ -465,13 +465,13 @@ class Trainer:
         
         self.dump_json_for_bondmachine()
         self.get_json_model()
-        self.build_graph()
+        #self.build_graph()
         
         #print(bcolors.OKGREEN + " # input name", self.model.input.op.name+bcolors.WHITE)
         #print(bcolors.OKGREEN + " # output name", self.model.output.op.name+bcolors.WHITE)
         print(bcolors.OKGREEN + " # INFO: Training finished, saved model path: "+'models/'+self.dataset+'_KERAS_model.h5'+bcolors.WHITE)
         self.model.save('models/'+self.dataset+'/model.h5')
-        meta_graph_def = tf.train.export_meta_graph(filename='models/'+self.dataset+'_KERAS_model.meta')
+        #meta_graph_def = tf.train.export_meta_graph(filename='models/'+self.dataset+'_KERAS_model.meta')
 
     def exec_test(self):
         print(self.model.summary())

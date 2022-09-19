@@ -16,6 +16,7 @@ The following libraries and tools have been used in order to achieve the goal:
 - [pynq][3]
 - [vivado][4]
 - [conda][5]
+- [graphviz][11]
 
 This tutorial will be divided in two parts: in the first one, you will generate the IP using the hls4ml library which is the core part of the inference phase on the FPGA. The IP will be a part of the overall design which is necessary to generate the bistream that runs on the FPGA. 
 At the end of this tutorial you will have all the necessary files to try and test the DNN model on the ebaz with the help of PYNQ that provides the API to access and use the bitstream (second part).
@@ -31,6 +32,7 @@ This guide does not focus on evaluating the accuracy performance of the neural n
 [8]: https://github.com/KhronosGroup/NNEF-Tools
 [9]: http://bondmachine.fisica.unipg.it/
 [10]: https://www.sciencedirect.com/science/article/pii/S0167819121001150
+[11]: https://graphviz.gitlab.io/download/ 
 
 ##### STEP 0: Check requirements
 First of all you need a basic knowledge of using Vivado and programming in Python.
@@ -45,6 +47,7 @@ git clone https://github.com/Bianco95/hls4ml-fpga.git
 conda create --name hls4ml-env python=3.8.0
 conda activate hls4ml-env
 pip3 install -r requirements.txt
+mkdir -p datasets
 ```
 
 ##### STEP 2: Make the ML IP 
