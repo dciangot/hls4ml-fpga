@@ -42,8 +42,10 @@ dataset_name = "banknote-authentication"
 hls4ml_output = read_hls4ml_output(dataset_name)
 bm_output = read_bm_output(dataset_name)
 
-keras_output = read_software_output(dataset_name)[:64]
-y_test = load_real_label(dataset_name)[:64]
+output_len = len(bm_output)
+
+keras_output = read_software_output(dataset_name)[:output_len]
+y_test = load_real_label(dataset_name)[:output_len]
 
 global_pct_errors_bm_o0 = []
 global_pct_errors_hls4ml_o0 = []
